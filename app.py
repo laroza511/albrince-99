@@ -5,46 +5,63 @@ import plotly.graph_objs as go
 import yfinance as yf
 from datetime import datetime, timedelta
 
-# تحميل البيانات
+# تحميل البيانات مع حماية ضد المشاكل
 def load_data():
     today = datetime.today()
-    start = today - timedelta(days=365)
-    try:
-        sp500 = yf.download(tickers='^GSPC', start=start, end=today, auto_adjust=False, progress=False)
-        dax = yf.download(tickers='^GDAXI', start=start, end=today, auto_adjust=False, progress=False)
-        ftse = yf.download(tickers='^FTSE', start=start, end=today, auto_adjust=False, progress=False)
-    except Exception as e:
-        print(f"Download error: {e}")
-        sp500, dax, ftse = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    start = today - timedelta(days=90)
 
-    print("S&P 500 rows:", len(sp500))
-    print("DAX rows:", len(dax))
-    print("FTSE rows:", len(ftse))
+    def safe_download(ticker):
+        try:
+            df = yf.download(tickers=ticker, start=start, end=today, auto_adjust=False, progress=False)
+            if df is not None and not df.empty and len(df) > 1:
+                return df
+            else:
+                print(f"[{ticker}] فشل التحميل أو البيانات غير كافية.")
+                return pd.DataFrame()
+        except Exception as e:
+            print(f"خطأ في تحميل {ticker}: {e}")
+            return pd.DataFrame()
+
+    sp500 = safe_download('^GSPC')
+    dax = safe_download('^GDAXI')
+    ftse = safe_download('^FTSE')
 
     return sp500, dax, ftse
 
+# تحميل البيانات
 sp500, dax, ftse = load_data()
 
 # إنشاء التطبيق
 app = dash.Dash(__name__)
 server = app.server
 
-def generate_graph(df, title, name):
-    if df.empty:
-        return html.Div(f"لا توجد بيانات لعرض {title}")
-    return dcc.Graph(
+app.layout = html.Div([
+    html.H1('لوحة متابعة الاقتصاد العالمي', style={'textAlign': 'center'}),
+
+    dcc.Graph(
+        id='sp500',
         figure={
-            'data': [go.Scatter(x=df.index, y=df['Close'], mode='lines', name=name)],
-            'layout': go.Layout(title=title, xaxis={'title': 'تاريخ'}, yaxis={'title': 'السعر'})
+            'data': [go.Scatter(x=sp500.index, y=sp500['Close'], mode='lines', name='S&P 500')] if not sp500.empty else [],
+            'layout': go.Layout(title='مؤشر S&P 500', xaxis={'title': 'التاريخ'}, yaxis={'title': 'السعر'})
+        }
+    ),
+
+    dcc.Graph(
+        id='dax',
+        figure={
+            'data': [go.Scatter(x=dax.index, y=dax['Close'], mode='lines', name='DAX')] if not dax.empty else [],
+            'layout': go.Layout(title='مؤشر DAX الألماني', xaxis={'title': 'التاريخ'}, yaxis={'title': 'السعر'})
+        }
+    ),
+
+    dcc.Graph(
+        id='ftse',
+        figure={
+            'data': [go.Scatter(x=ftse.index, y=ftse['Close'], mode='lines', name='FTSE 100')] if not ftse.empty else [],
+            'layout': go.Layout(title='مؤشر FTSE البريطاني', xaxis={'title': 'التاريخ'}, yaxis={'title': 'السعر'})
         }
     )
-
-app.layout = html.Div([
-    html.H1('لوحة التخصصات العالمية', style={'textAlign': 'center'}),
-    generate_graph(sp500, "S&P 500", "S&P 500"),
-    generate_graph(dax, "مؤشر DAX الألماني", "DAX"),
-    generate_graph(ftse, "مؤشر FTSE البريطاني", "FTSE")
 ])
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=True)
