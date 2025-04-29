@@ -8,36 +8,45 @@ from datetime import datetime, timedelta
 # تحميل البيانات
 def load_data():
     today = datetime.today()
-    start = today - timedelta(days=90)
-    try:
-        sp500 = yf.download('^GSPC', start=start, end=today, auto_adjust=True, progress=False).dropna()
-        dax = yf.download('^GDAXI', start=start, end=today, auto_adjust=True, progress=False).dropna()
-        ftse = yf.download('^FTSE', start=start, end=today, auto_adjust=True, progress=False).dropna()
-    except:
-        sp500 = dax = ftse = pd.DataFrame()
+    start = today - timedelta(days=365)  # مددنا الفترة سنة
+
+    sp500 = yf.download(tickers='^GSPC', start=start, end=today, auto_adjust=False, progress=False)
+    dax = yf.download(tickers='^GDAXI', start=start, end=today, auto_adjust=False, progress=False)
+    ftse = yf.download(tickers='^FTSE', start=start, end=today, auto_adjust=False, progress=False)
+
     return sp500, dax, ftse
 
 sp500, dax, ftse = load_data()
 
+# إنشاء التطبيق
 app = dash.Dash(__name__)
 server = app.server
 
-def create_chart(df, title, label):
-    if df.empty:
-        return html.Div(f"❌ تعذر تحميل بيانات {label}", style={'color': 'red', 'textAlign': 'center', 'fontSize': 20})
-    return dcc.Graph(
+app.layout = html.Div([
+    html.H1('لوحة التخصصات العالمية', style={'textAlign': 'center'}),
+
+    dcc.Graph(
+        id='sp500',
         figure={
-            'data': [go.Scatter(x=df.index, y=df['Close'], mode='lines', name=label)],
-            'layout': go.Layout(title=title, xaxis={'title': 'التاريخ'}, yaxis={'title': 'السعر'})
+            'data': [go.Scatter(x=sp500.index, y=sp500['Close'], mode='lines', name='S&P 500')],
+            'layout': go.Layout(title='S&P 500', xaxis={'title': 'تاريخ'}, yaxis={'title': 'السعر'})
+        }
+    ),
+    dcc.Graph(
+        id='dax',
+        figure={
+            'data': [go.Scatter(x=dax.index, y=dax['Close'], mode='lines', name='DAX')],
+            'layout': go.Layout(title='الألماني DAX', xaxis={'title': 'تاريخ'}, yaxis={'title': 'السعر'})
+        }
+    ),
+    dcc.Graph(
+        id='ftse',
+        figure={
+            'data': [go.Scatter(x=ftse.index, y=ftse['Close'], mode='lines', name='FTSE')],
+            'layout': go.Layout(title='البريطاني FTSE', xaxis={'title': 'تاريخ'}, yaxis={'title': 'السعر'})
         }
     )
-
-app.layout = html.Div([
-    html.H1("لوحة متابعة الأسواق العالمية", style={'textAlign': 'center'}),
-    create_chart(sp500, 'S&P 500', 'S&P 500'),
-    create_chart(dax, 'DAX الألماني', 'DAX'),
-    create_chart(ftse, 'FTSE البريطاني', 'FTSE 100')
 ])
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run_server(debug=True)
